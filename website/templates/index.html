@@ -1,0 +1,2291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLB Report Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #ffffff;
+            color: #1a1a1a;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        #overlayBg {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9998;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        #overlayBg.show {
+            display: block;
+            opacity: 1;
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            opacity: 1;
+            transition: opacity 0.8s ease;
+        }
+
+        .loading-screen.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-logo {
+            font-size: 48px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+            animation: slideInDown 0.8s ease forwards;
+        }
+
+        .loading-subtitle {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 400;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .loading-dots {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .loading-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .loading-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes slideInDown {
+            from {
+                transform: translateY(-30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideInUp {
+            from {
+                transform: translateY(60px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 260px;
+            height: 100vh;
+            background: #f8f9fa;
+            border-right: 1px solid #e5e7eb;
+            padding: 24px 0;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 0 24px 24px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .sidebar-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+
+        .sidebar-subtitle {
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .nav-menu {
+            margin-top: 24px;
+            list-style: none;
+        }
+
+        .nav-item {
+            margin-bottom: 4px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 14px 24px;
+            color: #4b5563;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .nav-link:hover {
+            background: #e5e7eb;
+            color: #1a1a1a;
+        }
+
+        .nav-link.active {
+            background: #2c3e50;
+            color: white;
+            border-left: 3px solid #3498db;
+        }
+
+        .nav-icon {
+            margin-right: 12px;
+            font-size: 20px;
+        }
+
+        .main-content {
+            margin-left: 260px;
+            min-height: 100vh;
+            background: #ffffff;
+        }
+
+        .page {
+            display: none;
+            padding: 10px 10px;
+            max-width: 1500px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .page-header {
+            display: none;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .page-header.show {
+            display: block;
+        }
+
+        .page-title {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+        }
+
+        .page-description {
+            font-size: 16px;
+            color: #6b7280;
+        }
+
+        .upload-page-content {
+            display: flex;
+            gap: 24px;
+            align-items: stretch;
+            min-height: calc(100vh - 350px);
+        }
+
+        .upload-left-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .upload-right-section {
+            flex: 0 0 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .upload-container {
+            background: white;
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 1px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 1px;
+        }
+
+        .upload-container:hover {
+            border-color: #2c3e50;
+            background: #f9fafb;
+        }
+
+        .upload-container.dragover {
+            border-color: #3498db;
+            background: #eff6ff;
+        }
+
+        .upload-container.has-file {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .upload-container.error {
+            border-color: #ef4444;
+            background: #fef2f2;
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            color: #9ca3af;
+        }
+
+        .upload-icon.has-file {
+            font-size: 80px;
+            color: #10b981;
+        }
+
+        .upload-icon.error {
+            font-size: 80px;
+            color: #ef4444;
+        }
+
+        .upload-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+        }
+
+        .upload-hint {
+            font-size: 15px;
+            color: #9ca3af;
+        }
+
+        .file-details {
+            text-align: center;
+        }
+
+        .file-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #10b981;
+            margin-bottom: 8px;
+        }
+
+        .file-name.error {
+            color: #ef4444;
+        }
+
+        .file-size {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 16px;
+        }
+
+        .file-error {
+            font-size: 13px;
+            color: #ef4444;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .btn-remove {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-remove:hover {
+            background: #dc2626;
+        }
+
+        .action-buttons {
+            margin-top: 24px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 32px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: #2c3e50;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #1a252f;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(44, 62, 80, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .usage-section {
+            padding: 32px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+        }
+
+        .usage-section.top {
+            flex: 1;
+        }
+
+        .usage-section.bottom {
+            flex: 1;
+        }
+
+        .usage-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .usage-content {
+            font-size: 14px;
+            color: #4b5563;
+            line-height: 1.7;
+        }
+
+        .usage-content ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .usage-content li {
+            margin-bottom: 6px;
+        }
+
+        .search-section {
+            margin-bottom: 32px;
+        }
+
+        .search-input {
+            width: 100%;
+            max-width: 500px;
+            padding: 14px 18px 14px 48px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.2s ease;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 16px center;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #2c3e50;
+            box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.1);
+        }
+
+        .data-table {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .table-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .btn-add {
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-add:hover {
+            background: #1a252f;
+        }
+
+        .table-body {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .table-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background 0.2s ease;
+        }
+
+        .table-row:hover {
+            background: #f9fafb;
+        }
+
+        .table-row:last-child {
+            border-bottom: none;
+        }
+
+        .row-name {
+            font-size: 15px;
+            color: #1a1a1a;
+            font-weight: 500;
+        }
+
+        .btn-delete {
+            background: transparent;
+            border: 1px solid #e5e7eb;
+            color: #6b7280;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-delete:hover {
+            background: #fef2f2;
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10001;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 36px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 10px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 15px;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #2c3e50;
+            box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.1);
+        }
+
+        .team-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .team-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #6b7280;
+        }
+
+        .team-btn:hover {
+            border-color: #2c3e50;
+        }
+
+        .team-btn.selected {
+            background: #2c3e50;
+            color: white;
+            border-color: #2c3e50;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        .modal-actions button {
+            flex: 1;
+        }
+
+        .processing-screen {
+            display: block;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) translateY(80px);
+            background: white;
+            border-radius: 16px;
+            padding: 60px 48px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            text-align: center;
+            opacity: 0;
+            transition: all 0.6s ease;
+            pointer-events: none;
+        }
+
+        .processing-screen.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) translateY(0);
+            pointer-events: auto;
+        }
+
+        .processing-content {
+            text-align: center;
+        }
+
+        .processing-icon {
+            font-size: 72px;
+            margin-bottom: 28px;
+            animation: spin 2s linear infinite;
+        }
+
+        .processing-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 14px;
+        }
+
+        .processing-description {
+            font-size: 16px;
+            color: #6b7280;
+            margin-bottom: 36px;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 12px;
+            background: #e5e7eb;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #2c3e50 0%, #3498db 100%);
+            width: 0%;
+            transition: width 0.4s ease;
+            border-radius: 6px;
+        }
+
+        .progress-text {
+            font-size: 15px;
+            color: #6b7280;
+            font-weight: 500;
+        }
+
+        .checking-screen {
+            display: block;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) translateY(80px);
+            background: white;
+            border-radius: 16px;
+            padding: 60px 48px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            text-align: center;
+            opacity: 0;
+            transition: all 0.6s ease;
+            pointer-events: none;
+        }
+
+        .checking-screen.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) translateY(0);
+            pointer-events: auto;
+        }
+
+        .checking-content {
+            text-align: center;
+        }
+
+        .checking-icon {
+            font-size: 72px;
+            margin-bottom: 28px;
+            animation: spin 2s linear infinite;
+        }
+
+        .checking-icon.success {
+            animation: none;
+            color: #10b981;
+        }
+
+        .checking-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 14px;
+        }
+
+        .checking-title.success {
+            color: #10b981;
+        }
+
+        .checking-description {
+            font-size: 16px;
+            color: #6b7280;
+        }
+
+        .download-page {
+            display: block;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) translateY(80px);
+            background: white;
+            border-radius: 16px;
+            padding: 60px 48px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            z-index: 9999;
+            text-align: center;
+            opacity: 0;
+            transition: all 0.6s ease;
+            pointer-events: none;
+        }
+
+        .download-page.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) translateY(0);
+            pointer-events: auto;
+        }
+
+        .download-container {
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .download-icon {
+            font-size: 96px;
+            margin-bottom: 24px;
+            animation: bounce 2s ease infinite;
+        }
+
+        .download-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+        }
+
+        .download-description {
+            font-size: 16px;
+            color: #6b7280;
+            margin-bottom: 32px;
+            line-height: 1.8;
+        }
+
+        .download-filename {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 32px;
+            font-family: 'Courier New', monospace;
+            color: #1a1a1a;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .download-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 16px 40px;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-back {
+            background: #f3f4f6;
+            color: #4b5563;
+            padding: 16px 40px;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-back:hover {
+            background: #e5e7eb;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+
+        .empty-icon {
+            font-size: 56px;
+            margin-bottom: 18px;
+        }
+
+        .empty-text {
+            font-size: 15px;
+        }
+
+        .file-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .file-card:hover {
+            border-color: #2c3e50;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .file-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+
+        .file-card-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 6px;
+        }
+
+        .file-card-meta {
+            font-size: 13px;
+            color: #9ca3af;
+        }
+
+        .file-card-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-icon {
+            background: transparent;
+            border: 1px solid #e5e7eb;
+            padding: 10px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #6b7280;
+            transition: all 0.2s ease;
+        }
+
+        .btn-icon:hover {
+            background: #f9fafb;
+            border-color: #2c3e50;
+            color: #2c3e50;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .new-name-item {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .new-name-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .new-name-text {
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .row-badge {
+            font-size: 12px;
+            color: #6b7280;
+            background: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        .duplicate-date-item {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .duplicate-date-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .duplicate-date-text {
+            font-weight: 600;
+            color: #92400e;
+        }
+
+        .duplicate-tables {
+            font-size: 13px;
+            color: #78350f;
+            margin-top: 6px;
+        }
+
+        .warning-icon {
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+        .date-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px 24px;
+        margin-bottom: 12px;
+        transition: all 0.2s ease;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .date-card:hover {
+        border-color: #2c3e50;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .date-info {
+        flex: 1;
+    }
+
+    .date-value {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1a1a1a;
+        margin-bottom: 4px;
+    }
+
+    .date-meta {
+        font-size: 13px;
+        color: #6b7280;
+    }
+
+    .btn-delete-date {
+        background: transparent;
+        border: 1px solid #e5e7eb;
+        color: #ef4444;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-delete-date:hover {
+        background: #fef2f2;
+        border-color: #ef4444;
+    }
+    </style>
+</head>
+<body>
+    
+    <!-- Overlay Background -->
+    <div id="overlayBg"></div>
+
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-logo">PLB Report Generator</div>
+        <div class="loading-subtitle">
+            Commandos & STs
+            <div class="loading-dots">
+                <span class="loading-dot"></span>
+                <span class="loading-dot"></span>
+                <span class="loading-dot"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">PLB Report Generator</div>
+            <div class="sidebar-subtitle">Management System</div>
+        </div>
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <a class="nav-link active" data-page="upload">
+                    <span class="nav-icon">📤</span>
+                    Upload Report
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-page="files">
+                    <span class="nav-icon">📁</span>
+                    Processed Files
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-page="commandos">
+                    <span class="nav-icon">👥</span>
+                    Commandos Name List
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-page="st">
+                    <span class="nav-icon">👥</span>
+                    STs Name List
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-page="weekly">
+                    <span class="nav-icon">📊</span>
+                    Manage Historic Data
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Upload Page -->
+        <div class="page active" id="uploadPage">
+            <div class="page-header show">
+                <h1 class="page-title">Report Automation System - PLB Tabulation Report</h1>
+                <p class="page-description">Upload CSV or Excel file provided by service provider to generate the PLB Tabulation Report (Max 1.5MB Upload)</p>
+                <p class="page-description">
+                    <b>Access PLB Tabulation Analysis Dashboard →</b>
+                    <a href="https://plb-tabulation-analysis.onrender.com/" target="_blank" rel="noopener noreferrer">
+                        PLB Tabulation Analysis Dashboard
+                    </a>
+            </div>
+
+            <div class="upload-page-content">
+                <!-- Left Section: Upload Box -->
+                <div class="upload-left-section">
+                    <form id="uploadForm" style="display: flex; flex-direction: column; height: 100%;">
+                        <div class="upload-container" id="uploadArea">
+                            <div class="upload-icon" id="uploadIcon">📄</div>
+                            <div id="uploadContent">
+                                <div class="upload-title">Click to browse or drag & drop</div>
+                                <div class="upload-hint">Supports CSV and Excel files (.csv, .xlsx, .xls) • Max 1.5MB</div>
+                            </div>
+                            <div id="fileContent" style="display: none;">
+                                <div class="file-name" id="fileName"></div>
+                                <div class="file-size" id="fileSize"></div>
+                                <div class="file-error" id="fileError" style="display: none;"></div>
+                                <button type="button" class="btn-remove" id="removeFileBtn">Remove File</button>
+                            </div>
+                            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
+                        </div>
+
+                        <div class="action-buttons">
+                            <button type="submit" class="btn btn-primary" id="generateBtn" disabled>
+                                Generate Report
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Right Section: Usage Instructions (Top and Bottom) -->
+                <div class="upload-right-section">
+                    <div class="usage-section top">
+                        <h3 class="usage-title">📋 Usage Instructions</h3>
+                        <div class="usage-content">
+                            <p>Upload data file and the system will automatically:</p>
+                            <ul>
+                                <li>Check if your uploaded data data already exists in the database: Selecting “Overwrite Existing” will replace the existing data in the database with data from the uploaded file after it has been processed</li>
+                                <li>Check for any new names in the uploaded file that is not stored in the database: Assign them to either Commandos or ST before processing can begin</li>
+                                <li>Process & generate PLB Tabulation Report for Commandos & STs</li>
+                                <li>Estimated processing time: daily data – up to 30 seconds; weekly data – up to 3 minutes</li>
+                                <li>The PLB Tabulation Report will become downloadable after processing is complete</li>
+                                <li>The generated report will be stored on the “Processed Files” page</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="usage-section bottom">
+                        <h3 class="usage-title">⚠️ Important Notes</h3>
+                        <div class="usage-content">
+                            <ul>
+                                <li><strong>Maximum upload file size: 1.5MB</strong></li>
+                                <li><strong>System processes only the first sheet of the Excel File. Please verify that data is complete and accurate</strong></li>
+                                <li><strong>If the file fails to process (e.g., an error occurs), refresh the page and try again. Select "Overwrite Existing" when retrying to prevent conflicts with the database</strong></li>
+                                <li><strong>Do not refresh the page when the report is being generated</strong></li>
+                                <li><strong>If the system crashes, refresh the page and try again after a few minutes</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Processed Files Page -->
+        <div class="page" id="filesPage">
+            <div class="page-header">
+                <h1 class="page-title">Processed Files</h1>
+                <p class="page-description">View and download previously generated reports from cloud storage</p>
+            </div>
+
+            <div class="search-section">
+                <input type="text" class="search-input" id="filesSearch" placeholder="Search files...">
+            </div>
+
+            <div id="filesContainer"></div>
+        </div>
+
+        <!-- Commandos List Page -->
+        <div class="page" id="commandosPage">
+            <div class="page-header">
+                <h1 class="page-title">Commandos Name List</h1>
+                <p class="page-description">Manage the list of Commandos team members</p>
+            </div>
+
+            <div class="search-section">
+                <input type="text" class="search-input" id="commandosSearch" placeholder="Search names...">
+            </div>
+
+            <div class="data-table">
+                <div class="table-header">
+                    <div class="table-title">Team Members</div>
+                    <button class="btn-add" id="addCommandoBtn">+ Add Name</button>
+                </div>
+                <div class="table-body" id="commandosTableBody"></div>
+            </div>
+        </div>
+
+        <!-- ST List Page -->
+        <div class="page" id="stPage">
+            <div class="page-header">
+                <h1 class="page-title">ST Name List</h1>
+                <p class="page-description">Manage the list of ST team members</p>
+            </div>
+
+            <div class="search-section">
+                <input type="text" class="search-input" id="stSearch" placeholder="Search names...">
+            </div>
+
+            <div class="data-table">
+                <div class="table-header">
+                    <div class="table-title">Team Members</div>
+                    <button class="btn-add" id="addSTBtn">+ Add Name</button>
+                </div>
+                <div class="table-body" id="stTableBody"></div>
+            </div>
+        </div>
+
+    <!-- Manage Weekly Data Page -->
+        <div class="page" id="weeklyPage">
+            <div class="page-header">
+                <h1 class="page-title">Manage Historic Data</h1>
+                <p class="page-description">View and delete daily data from database - This will directly affect graphs on the analysis dashboard</p>
+            </div>
+
+            <div class="search-section">
+                <input type="text" class="search-input" id="weeklySearch" placeholder="Search dates...">
+            </div>
+
+            <div class="data-table">
+                <div class="table-header">
+                    <div class="table-title">Data Records by Date</div>
+                </div>
+                <div class="table-body" id="weeklyTableBody"></div>
+            </div>
+        </div>
+    </div> 
+
+    <!-- Processing Screen -->
+    <div class="processing-screen" id="processingScreen">
+        <div class="processing-content">
+            <div class="processing-icon">⚙️</div>
+            <h2 class="processing-title" id="processingTitle">Generating Report</h2>
+            <p class="processing-description" id="processingText">Initializing...</p>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText">0%</div>
+        </div>
+    </div>
+
+    <!-- Checking Screen -->
+    <div class="checking-screen" id="checkingScreen">
+        <div class="checking-content">
+            <div class="checking-icon">🔍</div>
+            <h2 class="checking-title">Checking for New Names...</h2>
+            <p class="checking-description">Please wait while we verify the data...</p>
+        </div>
+    </div>
+
+    <!-- Download Page -->
+    <div class="download-page" id="downloadPage">
+        <div class="download-container">
+            <div class="download-icon">📥</div>
+            <h1 class="download-title">Report Ready!</h1>
+            <p class="download-description">
+                Your PLB Tabulation Report has been successfully generated and processed
+            </p>
+            <div class="download-filename" id="downloadFilename"></div>
+            <div class="download-actions">
+                <button class="btn-download" id="downloadBtn">⬇️ Download Report</button>
+                <button class="btn-back" id="backBtn">Back to Upload</button>
+            </div>
+        </div>
+    </div>
+    <!-- New Names Assignment Modal -->
+    <div class="modal" id="newNamesModal">
+        <div class="modal-content">
+            <h2 class="modal-title">New Names Found</h2>
+            <p class="page-description" style="margin-bottom: 24px;">Please assign each name to a team before continuing</p>
+            <div id="newNamesList"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelAssignBtn">Cancel</button>
+                <button class="btn btn-primary" id="continueProcessBtn" disabled>Continue Processing</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Duplicate Dates Modal -->
+    <div class="modal" id="duplicateDatesModal">
+        <div class="modal-content">
+            <div class="warning-icon">⚠️</div>
+            <h2 class="modal-title">Data Conflict Found</h2>
+            <p class="page-description" style="margin-bottom: 24px;"><b>We found data already saved for these dates in the database. Would you like to replace the existing data in the database with data from your uploaded file after it has been have processed?</b></p>
+            <div id="duplicateDatesList"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelDuplicateBtn">Cancel</button>
+                <button class="btn btn-primary" id="overwriteBtn">Overwrite Existing</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Name Modal -->
+    <div class="modal" id="addNameModal">
+        <div class="modal-content">
+            <h2 class="modal-title">Add New Name</h2>
+            <p style="text-indent: 0px;">Please ensure name entered <b>exactly matches</b> name in raw data</p>
+            <p style="text-indent: 0px;">You can have the <b>system detect new names automatically</b> and add them, instead of manually inputting</p>
+            <p style="text-indent: 0px;">&nbsp;</p>
+            <div class="form-group">
+                <label class="form-label">Name</label>
+                <input type="text" class="form-input" id="newNameInput" placeholder="Enter name...">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Team</label>
+                <div class="team-buttons">
+                    <button type="button" class="team-btn" data-team="commandos">Commandos</button>
+                    <button type="button" class="team-btn" data-team="st">ST</button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelAddBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmAddBtn" disabled>Add Name</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const MAX_FILE_SIZE = 1.5 * 1024 * 1024;
+
+        // HELPER FUNCTIONS
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function escapeHtml(text, forAttribute = false) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            const escaped = text.replace(/[&<>"']/g, m => map[m]);
+            return forAttribute ? escaped : escaped;
+        }
+
+        function formatDate(dateString) {
+            try {
+                return new Date(dateString).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+        // FILE SIZE VALIDATION
+        function validateFileSize(file) {
+            if (file.size > MAX_FILE_SIZE) {
+                return {
+                    valid: false,
+                    error: `File size (${formatFileSize(file.size)}) exceeds maximum of 1.5MB`
+                };
+            }
+            return { valid: true };
+        }
+
+        // DOWNLOAD FILE
+        async function downloadFile(filename) {
+            try {
+                const response = await fetch(`/api/processed_files/download/${encodeURIComponent(filename)}`);
+                
+                if (!response.ok) {
+                    try {
+                        const errorData = await response.json();
+                        alert('Error: ' + (errorData.error || 'Failed to download'));
+                    } catch (e) {
+                        alert('Error: Failed to download file (HTTP ' + response.status + ')');
+                    }
+                    return;
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+            } catch (error) {
+                console.error('Error downloading file:', error);
+                alert('Error downloading file: ' + error.message);
+            }
+        }
+
+
+        // DELETE FILE
+        async function deleteFile(filename) {
+            if (!confirm(`Delete ${filename}?`)) return;
+            
+            try {
+                const response = await fetch('/api/processed_files/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename })
+                });
+                
+                const data = await response.json();
+                if (!data.success) {
+                    alert('Error: ' + (data.error || 'Failed to delete'));
+                    return;
+                }
+                
+                loadProcessedFiles();
+                
+            } catch (error) {
+                console.error('Error deleting file:', error);
+                alert('Error deleting file: ' + error.message);
+            }
+        }
+
+        // LOAD PROCESSED FILES
+        async function loadProcessedFiles() {
+            const container = document.getElementById('filesContainer');
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading...</p></div>';
+
+            try {
+                const response = await fetch('/api/processed_files');
+                const data = await response.json();
+
+                if (!data.success) {
+                    container.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><p>Error: ${escapeHtml(data.error || 'Failed to load files')}</p></div>`;
+                    return;
+                }
+
+                if (!data.files || data.files.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📂</div><p>No files yet</p></div>';
+                    return;
+                }
+
+                container.innerHTML = data.files.map(file => `
+                    <div class="file-card">
+                        <div class="file-card-header">
+                            <div>
+                                <div class="file-card-name">${escapeHtml(file.name)}</div>
+                                <div class="file-card-meta">${formatFileSize(file.size)} • ${formatDate(file.modified)}</div>
+                            </div>
+                            <div class="file-card-actions">
+                                <button class="btn-icon" onclick="downloadFile('${escapeHtml(file.name, true)}')">⬇️ Download</button>
+                                <button class="btn-icon" onclick="deleteFile('${escapeHtml(file.name, true)}')">🗑️ Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                const searchInput = document.getElementById('filesSearch');
+                searchInput.addEventListener('input', (e) => {
+                    const query = e.target.value.toLowerCase();
+                    document.querySelectorAll('.file-card').forEach(card => {
+                        const name = card.querySelector('.file-card-name').textContent.toLowerCase();
+                        card.style.display = name.includes(query) ? 'block' : 'none';
+                    });
+                });
+
+            } catch (error) {
+                console.error('Error loading files:', error);
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div><p>Error loading files: ' + escapeHtml(error.message) + '</p></div>';
+            }
+        }
+
+
+        // INITIALIZATION
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('loadingScreen').classList.add('fade-out');
+            }, 2000);
+        });
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const page = link.dataset.page;
+                
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById(page + 'Page').classList.add('active');
+
+                document.querySelectorAll('.page-header').forEach(h => h.classList.remove('show'));
+                const header = document.querySelector(`#${page}Page .page-header`);
+                if (header) header.classList.add('show');
+
+                if (page === 'files') loadProcessedFiles();
+                if (page === 'commandos') loadCommandosList();
+                if (page === 'st') loadSTList();
+                if (page === 'weekly') loadWeeklyData();
+            });
+        });
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadIcon = document.getElementById('uploadIcon');
+        const uploadContent = document.getElementById('uploadContent');
+        const fileContent = document.getElementById('fileContent');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const fileError = document.getElementById('fileError');
+        const generateBtn = document.getElementById('generateBtn');
+        const removeFileBtn = document.getElementById('removeFileBtn');
+        let currentFile = null;
+        let newNamesData = [];
+        let duplicateDatesData = null;
+        let processingAction = null;
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect();
+            }
+        });
+
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const validation = validateFileSize(file);
+            
+            if (!validation.valid) {
+                currentFile = null;
+                fileName.textContent = file.name;
+                fileName.classList.add('error');
+                fileSize.textContent = formatFileSize(file.size);
+                fileError.textContent = validation.error;
+                fileError.style.display = 'block';
+                
+                uploadContent.style.display = 'none';
+                fileContent.style.display = 'block';
+                uploadIcon.classList.remove('has-file');
+                uploadIcon.classList.add('error');
+                uploadIcon.textContent = '⚠️';
+                uploadArea.classList.remove('has-file');
+                uploadArea.classList.add('error');
+                
+                generateBtn.disabled = true;
+                return;
+            }
+
+            currentFile = file;
+            fileName.textContent = file.name;
+            fileName.classList.remove('error');
+            fileSize.textContent = formatFileSize(file.size);
+            fileError.style.display = 'none';
+            
+            uploadContent.style.display = 'none';
+            fileContent.style.display = 'block';
+            uploadIcon.classList.remove('error');
+            uploadIcon.classList.add('has-file');
+            uploadIcon.textContent = '✓';
+            uploadArea.classList.remove('error');
+            uploadArea.classList.add('has-file');
+            
+            generateBtn.disabled = false;
+        }
+
+        removeFileBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            currentFile = null;
+            uploadContent.style.display = 'block';
+            fileContent.style.display = 'none';
+            fileName.classList.remove('error');
+            uploadIcon.classList.remove('has-file', 'error');
+            uploadIcon.textContent = '📄';
+            uploadArea.classList.remove('has-file', 'error');
+            fileError.style.display = 'none';
+            generateBtn.disabled = true;
+        });
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentFile) return;
+            
+            const validation = validateFileSize(currentFile);
+            if (!validation.valid) {
+                alert(validation.error);
+                return;
+            }
+            
+            generateBtn.disabled = true;
+            await checkDuplicateDates();
+        });
+
+        async function checkDuplicateDates() {
+            showCheckingScreen();
+            document.getElementById('checkingScreen').querySelector('.checking-title').textContent = 'Checking for Duplicate Data';
+            document.getElementById('checkingScreen').querySelector('.checking-description').textContent = 'Verifying if data in your uploaded file already exist in the database';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', currentFile);
+
+                const response = await fetch('/api/check-duplicate-dates', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    hideCheckingScreen();
+                    document.getElementById('overlayBg').classList.remove('show');
+                    throw new Error('Server error: ' + errorText);
+                }
+
+                const data = await response.json();
+                if (!data.success) {
+                    hideCheckingScreen();
+                    document.getElementById('overlayBg').classList.remove('show');
+                    throw new Error(data.error || 'Unknown error occurred');
+                }
+
+                duplicateDatesData = data;
+
+                if (data.has_duplicates) {
+                    setTimeout(() => {
+                        hideCheckingScreen();
+                        setTimeout(() => {
+                            displayDuplicateDates(data.duplicates);
+                        }, 600);
+                    }, 500);
+                } else {
+                    showSuccessCheck('No Duplicate Data Found', 'All data are new - proceeding...');
+                    
+                    setTimeout(() => {
+                        hideCheckingScreen();
+                        setTimeout(() => {
+                            checkNewNames();
+                        }, 600);
+                    }, 1500);
+                }
+
+            } catch (error) {
+                hideCheckingScreen();
+                document.getElementById('overlayBg').classList.remove('show');
+                console.error('Error:', error);
+                alert('Error checking data: ' + error.message);
+                generateBtn.disabled = false;
+            }
+        }
+
+        function displayDuplicateDates(duplicates) {
+            const modal = document.getElementById('duplicateDatesModal');
+            const duplicateList = document.getElementById('duplicateDatesList');
+            duplicateList.innerHTML = '';
+
+            for (const [date, tables] of Object.entries(duplicates)) {
+                const item = document.createElement('div');
+                item.className = 'duplicate-date-item';
+                item.innerHTML = `
+                    <div class="duplicate-date-header">
+                        <span class="duplicate-date-text">📅 ${escapeHtml(date)}</span>
+                    </div>
+                `;
+                duplicateList.appendChild(item);
+            }
+
+            document.getElementById('overlayBg').classList.add('show');
+            modal.classList.add('show');
+        }
+
+        document.getElementById('overwriteBtn').addEventListener('click', () => {
+            processingAction = 'overwrite';
+            document.getElementById('duplicateDatesModal').classList.remove('show');
+            
+            showCheckingScreen();
+            document.getElementById('checkingScreen').querySelector('.checking-title').textContent = 'Overwriting';
+            document.getElementById('checkingScreen').querySelector('.checking-description').textContent = 'Please wait while current data in the database is being deleted';
+            
+            setTimeout(() => {
+                hideCheckingScreen();
+                setTimeout(() => {
+                    checkNewNames();
+                }, 600);
+            }, 1000);
+        });
+
+        document.getElementById('cancelDuplicateBtn').addEventListener('click', () => {
+            document.getElementById('duplicateDatesModal').classList.remove('show');
+            document.getElementById('overlayBg').classList.remove('show');
+            resetUploadForm();
+        });
+
+        async function checkNewNames() {
+            showCheckingScreen();
+            document.getElementById('checkingScreen').querySelector('.checking-title').textContent = 'Checking for New Names';
+            document.getElementById('checkingScreen').querySelector('.checking-description').textContent = 'Please wait while we cross-check for any names in your uploaded file that is not recognised by the system';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', currentFile);
+
+                const response = await fetch('/api/check-new-names-daily', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    hideCheckingScreen();
+                    document.getElementById('overlayBg').classList.remove('show');
+                    throw new Error('Server error: ' + errorText);
+                }
+
+                const data = await response.json();
+                if (!data.success) {
+                    hideCheckingScreen();
+                    document.getElementById('overlayBg').classList.remove('show');
+                    throw new Error(data.error || 'Unknown error occurred');
+                }
+
+                newNamesData = data.new_names || [];
+
+                if (newNamesData.length === 0) {
+                    showSuccessCheck('No New Names Found', 'All staff are already in the database');
+                    
+                    setTimeout(() => {
+                        hideCheckingScreen();
+                        setTimeout(() => {
+                            processFile();
+                        }, 600);
+                    }, 1500);
+                } else {
+                    setTimeout(() => {
+                        hideCheckingScreen();
+                        setTimeout(() => {
+                            displayNewNames();
+                        }, 600);
+                    }, 500);
+                }
+
+            } catch (error) {
+                hideCheckingScreen();
+                document.getElementById('overlayBg').classList.remove('show');
+                console.error('Error:', error);
+                alert('Error checking names: ' + error.message);
+                generateBtn.disabled = false;
+            }
+        }
+
+        function displayNewNames() {
+            const modal = document.getElementById('newNamesModal');
+            const newNamesList = document.getElementById('newNamesList');
+            newNamesList.innerHTML = '';
+
+            newNamesData.forEach((nameData, index) => {
+                const item = document.createElement('div');
+                item.className = 'new-name-item';
+                item.innerHTML = `
+                    <div class="new-name-header">
+                        <span class="new-name-text">${escapeHtml(nameData.name)}</span>
+                        <span class="row-badge">Row ${nameData.row}</span>
+                    </div>
+                    <div class="team-buttons">
+                        <button type="button" class="team-btn" data-index="${index}" data-team="commandos">Commandos</button>
+                        <button type="button" class="team-btn" data-index="${index}" data-team="st">ST</button>
+                    </div>
+                `;
+                newNamesList.appendChild(item);
+            });
+
+            document.querySelectorAll('#newNamesList .team-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const index = this.dataset.index;
+                    const team = this.dataset.team;
+                    
+                    this.parentElement.querySelectorAll('.team-btn').forEach(b => {
+                        b.classList.remove('selected');
+                    });
+                    
+                    this.classList.add('selected');
+                    newNamesData[index].selectedTeam = team;
+                    
+                    const allAssigned = newNamesData.every(item => item.selectedTeam);
+                    document.getElementById('continueProcessBtn').disabled = !allAssigned;
+                });
+            });
+
+            document.getElementById('continueProcessBtn').disabled = true;
+            
+            document.getElementById('overlayBg').classList.add('show');
+            modal.classList.add('show');
+        }
+
+        document.getElementById('continueProcessBtn').addEventListener('click', async () => {
+            document.getElementById('newNamesModal').classList.remove('show');
+            
+            showCheckingScreen();
+            document.getElementById('checkingScreen').querySelector('.checking-title').textContent = 'Saving Names';
+            document.getElementById('checkingScreen').querySelector('.checking-description').textContent = 'Adding names to database...';
+
+            try {
+                for (const item of newNamesData) {
+                    await fetch('/api/add-name', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: item.name, team: item.selectedTeam })
+                    });
+                }
+
+                showSuccessCheck('All Staff Assigned', 'Proceeding to generate report...');
+
+                setTimeout(() => {
+                    hideCheckingScreen();
+                    setTimeout(() => {
+                        processFile();
+                    }, 600);
+                }, 1500);
+
+            } catch (error) {
+                hideCheckingScreen();
+                document.getElementById('overlayBg').classList.remove('show');
+                console.error('Error:', error);
+                alert('Error saving names: ' + error.message);
+                generateBtn.disabled = false;
+                
+                setTimeout(() => {
+                    document.getElementById('checkingScreen').querySelector('.checking-title').textContent = 'Checking for new Names';
+                    document.getElementById('checkingScreen').querySelector('.checking-description').textContent = 'Please wait while we check for any names in your uploaded file that is not recognised by the system';
+                }, 200);
+            }
+        });
+
+        document.getElementById('cancelAssignBtn').addEventListener('click', () => {
+            document.getElementById('newNamesModal').classList.remove('show');
+            document.getElementById('overlayBg').classList.remove('show');
+            resetUploadForm();
+        });
+
+        function resetUploadForm() {
+            fileInput.value = '';
+            currentFile = null;
+            uploadContent.style.display = 'block';
+            fileContent.style.display = 'none';
+            fileName.classList.remove('error');
+            uploadIcon.classList.remove('has-file', 'error');
+            uploadIcon.textContent = '📄';
+            uploadArea.classList.remove('has-file', 'error');
+            fileError.style.display = 'none';
+            generateBtn.disabled = true;
+            processingAction = null;
+            duplicateDatesData = null;
+        }
+
+        async function processFile() {
+            showProcessing('Processing file...', 0);
+            let currentProgress = 0;
+
+            const progressInterval = setInterval(() => {
+                currentProgress += 20;
+                if (currentProgress <= 80) {
+                    const messages = [
+                        'Processing file...',
+                        'Uploading to server...',
+                        'Finalizing report...',
+                        'Completing upload...'
+                    ];
+                    updateProgress(currentProgress, messages[currentProgress / 20 - 1]);
+                }
+            }, 20000);
+
+            try {
+                const formData = new FormData();
+                formData.append('file', currentFile);
+                
+                if (processingAction) {
+                    formData.append('action', processingAction);
+                }
+
+                const endpoint = processingAction ? '/api/process-with-action' : '/';
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+
+                if (!response.ok) throw new Error('Upload failed');
+
+                updateProgress(100, 'Complete!');
+
+                const blob = await response.blob();
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'PLB_Report.xlsx';
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                    if (match) filename = match[1];
+                }
+
+                setTimeout(() => {
+                    hideProcessing();
+                    setTimeout(() => {
+                        showDownloadPage(blob, filename);
+                    }, 600);
+                }, 1000);
+
+            } catch (error) {
+                clearInterval(progressInterval);
+                hideProcessing();
+                document.getElementById('overlayBg').classList.remove('show');
+                console.error('Error:', error);
+                alert('Error processing file: ' + error.message);
+                generateBtn.disabled = false;
+            }
+        }
+
+        function showDownloadPage(blob, filename) {
+            document.getElementById('downloadFilename').textContent = filename;
+            document.getElementById('downloadPage').classList.add('show');
+
+            document.getElementById('downloadBtn').onclick = () => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            };
+
+            document.getElementById('backBtn').onclick = () => {
+                document.getElementById('overlayBg').classList.remove('show');
+                document.getElementById('downloadPage').classList.remove('show');
+                
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById('uploadPage').classList.add('active');
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                document.querySelector('[data-page="upload"]').classList.add('active');
+                
+                resetUploadForm();
+            };
+        }
+
+        function showProcessing(text = 'Processing...', startProgress = 0) {
+            document.getElementById('overlayBg').classList.add('show');
+            document.getElementById('processingTitle').textContent = 'Generating Report';
+            document.getElementById('processingText').textContent = text;
+            document.getElementById('progressBar').style.width = startProgress + '%';
+            document.getElementById('progressText').textContent = startProgress + '%';
+            document.getElementById('processingScreen').classList.add('show');
+        }
+
+        function hideProcessing() {
+            const screen = document.getElementById('processingScreen');
+            if (screen && screen.classList.contains('show')) {
+                screen.classList.remove('show');
+                document.getElementById('progressBar').style.width = '0%';
+                document.getElementById('progressText').textContent = '0%';
+            }
+        }
+
+        function showCheckingScreen() {
+            document.getElementById('overlayBg').classList.add('show');
+            const screen = document.getElementById('checkingScreen');
+            const icon = screen.querySelector('.checking-icon');
+            const title = screen.querySelector('.checking-title');
+            const description = screen.querySelector('.checking-description');
+            
+            icon.classList.remove('success');
+            title.classList.remove('success');
+            icon.textContent = '🔍';
+            title.textContent = 'Checking for new Names';
+            description.textContent = 'Please wait while we verify the data...';
+            
+            screen.classList.add('show');
+        }
+
+        function showSuccessCheck(titleText, descriptionText) {
+            const screen = document.getElementById('checkingScreen');
+            const icon = screen.querySelector('.checking-icon');
+            const title = screen.querySelector('.checking-title');
+            const description = screen.querySelector('.checking-description');
+            
+            icon.classList.add('success');
+            title.classList.add('success');
+            icon.textContent = '✓';
+            title.textContent = titleText;
+            description.textContent = descriptionText;
+        }
+
+        function hideCheckingScreen() {
+            const screen = document.getElementById('checkingScreen');
+            if (screen && screen.classList.contains('show')) {
+                screen.classList.remove('show');
+            }
+        }
+
+        function updateProgress(percentage, text) {
+            document.getElementById('progressBar').style.width = percentage + '%';
+            document.getElementById('progressText').textContent = percentage + '%';
+            document.getElementById('processingText').textContent = text;
+        }
+
+        async function loadCommandosList() {
+            loadNamesList('commandos', document.getElementById('commandosTableBody'), document.getElementById('commandosSearch'), document.getElementById('addCommandoBtn'));
+        }
+
+        async function loadSTList() {
+            loadNamesList('st', document.getElementById('stTableBody'), document.getElementById('stSearch'), document.getElementById('addSTBtn'));
+        }
+
+        async function loadNamesList(team, tableBody, searchInput, addBtn) {
+            tableBody.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading...</p></div>';
+
+            try {
+                const endpoint = team === 'commandos' ? '/api/commandos_namelist' : '/api/st_namelist';
+                const response = await fetch(endpoint);
+                const data = await response.json();
+
+                if (!data.names || data.names.length === 0) {
+                    tableBody.innerHTML = '<div class="empty-state"><p>No names yet</p></div>';
+                } else {
+                    displayNames(team, data.names, tableBody);
+                }
+
+                searchInput.addEventListener('input', (e) => {
+                    const query = e.target.value.toLowerCase();
+                    document.querySelectorAll('.table-row').forEach(row => {
+                        const name = row.querySelector('.row-name').textContent.toLowerCase();
+                        row.style.display = name.includes(query) ? 'flex' : 'none';
+                    });
+                });
+
+                addBtn.addEventListener('click', () => openAddNameModal(team));
+
+            } catch (error) {
+                console.error('Error:', error);
+                tableBody.innerHTML = '<div class="empty-state">❌<p>Error loading names</p></div>';
+            }
+        }
+
+        function displayNames(team, names, tableBody) {
+            tableBody.innerHTML = names.map(name => `
+                <div class="table-row">
+                    <span class="row-name">${escapeHtml(name)}</span>
+                    <button class="btn-delete" onclick="deleteName('${team}', '${escapeHtml(name, true)}')">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        async function deleteName(team, name) {
+            if (!confirm(`Delete "${name}"?`)) return;
+            try {
+                const endpoint = team === 'commandos' ? '/api/commandos_namelist/delete' : '/api/st_namelist/delete';
+                await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+
+                if (team === 'commandos') loadCommandosList();
+                else loadSTList();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        let selectedTeam = null;
+
+        function openAddNameModal(team) {
+            selectedTeam = team;
+            document.getElementById('newNameInput').value = '';
+            document.querySelectorAll('#addNameModal .team-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                if (btn.dataset.team === team) {
+                    btn.classList.add('selected');
+                }
+            });
+            document.getElementById('confirmAddBtn').disabled = true;
+            document.getElementById('addNameModal').classList.add('show');
+        }
+
+        document.getElementById('newNameInput').addEventListener('input', (e) => {
+            document.getElementById('confirmAddBtn').disabled = !e.target.value.trim();
+        });
+
+        document.querySelectorAll('#addNameModal .team-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelectorAll('#addNameModal .team-btn').forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedTeam = this.dataset.team;
+            });
+        });
+
+        document.getElementById('confirmAddBtn').addEventListener('click', async () => {
+            const name = document.getElementById('newNameInput').value.trim();
+            if (!name || !selectedTeam) return;
+
+            try {
+                await fetch('/api/add-name', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, team: selectedTeam })
+                });
+
+                document.getElementById('addNameModal').classList.remove('show');
+                if (selectedTeam === 'commandos') loadCommandosList();
+                else loadSTList();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error adding name');
+            }
+        });
+
+        document.getElementById('cancelAddBtn').addEventListener('click', () => {
+            document.getElementById('addNameModal').classList.remove('show');
+        });
+
+        // MANAGE HISTORIC DATA
+        async function loadWeeklyData() {
+            const tableBody = document.getElementById('weeklyTableBody');
+            tableBody.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading...</p></div>';
+
+            try {
+                const response = await fetch('/api/weekly_data');
+                const data = await response.json();
+
+                if (!data.success) {
+                    tableBody.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><p>Error: ${escapeHtml(data.error || 'Failed to load data')}</p></div>`;
+                    return;
+                }
+
+                if (!data.dates || data.dates.length === 0) {
+                    tableBody.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><p>No data in database</p></div>';
+                    return;
+                }
+
+                displayWeeklyData(data.dates);
+
+                const searchInput = document.getElementById('weeklySearch');
+                searchInput.addEventListener('input', (e) => {
+                    const query = e.target.value.toLowerCase();
+                    document.querySelectorAll('.date-card').forEach(card => {
+                        const dateText = card.querySelector('.date-value').textContent.toLowerCase();
+                        card.style.display = dateText.includes(query) ? 'flex' : 'none';
+                    });
+                });
+
+            } catch (error) {
+                console.error('Error loading weekly data:', error);
+                tableBody.innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div><p>Error loading data: ' + escapeHtml(error.message) + '</p></div>';
+            }
+        }
+
+        function displayWeeklyData(dates) {
+            const tableBody = document.getElementById('weeklyTableBody');
+            
+            tableBody.innerHTML = dates.map(dateInfo => `
+                <div class="date-card">
+                    <div class="date-info">
+                        <div class="date-value">📅 ${escapeHtml(dateInfo.date)}</div>
+                    </div>
+                    <button class="btn-delete-date" onclick="deleteWeeklyDate('${escapeHtml(dateInfo.date, true)}')">
+                        🗑️ Delete
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        async function deleteWeeklyDate(date) {
+            if (!confirm(`Delete all data for ${date}?\n\nThis will remove data from all 6 database tables:\n- daily_commando\n- daily_st\n- daily_percentage_docked\n- commando_pivot_data\n- st_pivot_data\n- bay_alphabet_data`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/weekly_data/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    alert('Error: ' + (data.error || 'Failed to delete data'));
+                    return;
+                }
+
+                alert(`Successfully deleted ${data.total_deleted} records for ${date}`);
+                loadWeeklyData();
+
+            } catch (error) {
+                console.error('Error deleting weekly data:', error);
+                alert('Error deleting data: ' + error.message);
+            }
+        }
+
+        document.getElementById('refreshWeeklyBtn').addEventListener('click', () => {
+            loadWeeklyData();
+        });
+    </script>
+</body>
+
+</html>
+
+
